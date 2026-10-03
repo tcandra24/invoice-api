@@ -33,16 +33,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
       switch (exception.code) {
         case 'P2002':
           statusCode = HttpStatus.CONFLICT;
-          message = 'Data already exists';
+          message = 'Data sudah ada (duplikat)';
           break;
         case 'P2003':
           statusCode = HttpStatus.CONFLICT;
           message =
-            'Data cannot be processed because it is still related to other data or the reference is invalid';
+            'Data tidak bisa diproses karena masih berelasi dengan data lain atau referensi tidak valid';
           break;
         case 'P2025':
           statusCode = HttpStatus.NOT_FOUND;
-          message = 'Data not found';
+          message = 'Data tidak ditemukan';
+          break;
+        case 'P2034':
+          statusCode = HttpStatus.CONFLICT;
+          message = 'Terjadi bentrokan proses, silakan coba lagi';
           break;
         default:
           this.logger.error(`Prisma error ${exception.code}`, exception.stack);
