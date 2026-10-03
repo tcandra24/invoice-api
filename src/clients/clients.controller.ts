@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
@@ -16,27 +17,31 @@ export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
   @Post()
-  create(@Body() dto: CreateClientDto) {
-    return this.clientsService.create(dto);
+  create(@CurrentUser('id') userId: string, @Body() dto: CreateClientDto) {
+    return this.clientsService.create(userId, dto);
   }
 
   @Get()
-  findAll() {
-    return this.clientsService.findAll();
+  findAll(@CurrentUser('id') userId: string) {
+    return this.clientsService.findAll(userId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.clientsService.findOne(id);
+  findOne(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.clientsService.findOne(userId, id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateClientDto) {
-    return this.clientsService.update(id, dto);
+  update(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateClientDto,
+  ) {
+    return this.clientsService.update(userId, id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.clientsService.remove(id);
+  remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.clientsService.remove(userId, id);
   }
 }

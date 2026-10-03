@@ -1,28 +1,29 @@
 import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
-import { InvoicesService } from './invoices.service';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { InvoicesService } from './invoices.service';
 
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
   @Post()
-  create(@Body() dto: CreateInvoiceDto) {
-    return this.invoicesService.create(dto);
+  create(@CurrentUser('id') userId: string, @Body() dto: CreateInvoiceDto) {
+    return this.invoicesService.create(userId, dto);
   }
 
   @Get()
-  findAll() {
-    return this.invoicesService.findAll();
+  findAll(@CurrentUser('id') userId: string) {
+    return this.invoicesService.findAll(userId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.invoicesService.findOne(id);
+  findOne(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.invoicesService.findOne(userId, id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.invoicesService.remove(id);
+  remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.invoicesService.remove(userId, id);
   }
 }

@@ -10,7 +10,14 @@ import { CreateInvoiceDto } from './dto/create-invoice.dto';
 export class InvoicesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateInvoiceDto) {
+  async create(userId: string, dto: CreateInvoiceDto) {
+    const client = await this.prisma.client.findFirst({
+      where: { id: dto.clientId, userId },
+    });
+    if (!client) {
+      throw new NotFoundException('Client tidak ditemukan');
+    }
+
     const items = dto.items.map((item) => ({
       description: item.description,
       quantity: item.quantity,
@@ -21,16 +28,19 @@ export class InvoicesService {
     const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
     const discount = dto.discount ?? 0;
     const tax = dto.tax ?? 0;
+
+    if (discount > subtotal) {
+      throw new BadRequestException('Diskon tidak boleh melebihi subtotal');
+    }
+
     const total = subtotal - discount + tax;
 
-    const count = await this.prisma.invoice.count({
-      where: { userId: dto.userId },
-    });
+    const count = await this.prisma.invoice.count({ where: { userId } });
     const number = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
 
     return this.prisma.invoice.create({
       data: {
-        userId: dto.userId,
+        userId,
         clientId: dto.clientId,
         number,
         dueDate: new Date(dto.dueDate),
@@ -45,16 +55,17 @@ export class InvoicesService {
     });
   }
 
-  findAll() {
+  findAll(userId: string) {
     return this.prisma.invoice.findMany({
+      where: { userId },
       include: { client: true },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async findOne(id: string) {
-    const invoice = await this.prisma.invoice.findUnique({
-      where: { id },
+  async findOne(userId: string, id: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id, userId },
       include: { items: true, client: true },
     });
     if (!invoice) {
@@ -63,8 +74,8 @@ export class InvoicesService {
     return invoice;
   }
 
-  async remove(id: string) {
-    const invoice = await this.findOne(id);
+  async remove(userId: string, id: string) {
+    const invoice = await this.findOne(userId, id);
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException(
         'Hanya invoice berstatus DRAFT yang boleh dihapus',
