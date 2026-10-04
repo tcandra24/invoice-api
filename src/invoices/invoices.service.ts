@@ -3,8 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { daysUntil } from '../common/date.util';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { RemindersService } from '../reminders/reminders.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { QueryInvoicesDto } from './dto/query-invoices.dto';
@@ -18,7 +20,10 @@ import {
 
 @Injectable()
 export class InvoicesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reminders: RemindersService,
+  ) {}
 
   // ---------- Helper ----------
 
@@ -152,13 +157,20 @@ export class InvoicesService {
     const invoice = await this.findOne(userId, id);
     assertTransition(invoice.status, 'SENT');
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    if (invoice.dueDate < startOfToday) {
+    if (daysUntil(invoice.dueDate) < 0) {
       throw new BadRequestException(
         'Tanggal jatuh tempo sudah lewat, ubah dueDate sebelum mengirim',
       );
     }
+    if (!invoice.client.email) {
+      throw new BadRequestException(
+        'Client belum punya email, lengkapi data client terlebih dahulu',
+      );
+    }
+
+    // Email dikirim dulu. Kalau gagal, exception berhenti di sini
+    // dan status invoice tetap DRAFT.
+    await this.reminders.sendNotice(id, 'INITIAL');
 
     return this.prisma.invoice.update({
       where: { id },
