@@ -52,7 +52,7 @@ export class CreateInvoiceDto {
   notes?: string;
 
   @IsArray()
-  @ArrayMinSize(1, { message: 'invoice minimal punya 1 item' })
+  @ArrayMinSize(1, { message: 'The invoice must have at least one item' })
   @ValidateNested({ each: true })
   @Type(() => CreateInvoiceItemDto)
   items: CreateInvoiceItemDto[];

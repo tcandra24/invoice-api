@@ -22,14 +22,14 @@ export class ClientsController {
   constructor(private readonly clientsService: ClientsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Tambah client' })
+  @ApiOperation({ summary: 'Add client' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateClientDto) {
     return this.clientsService.create(userId, dto);
   }
 
   @Get()
   @ApiOperation({
-    summary: 'Daftar client milik user (pagination + pencarian nama/email)',
+    summary: 'List clients owned by user (pagination + search by name/email)',
   })
   findAll(
     @CurrentUser('id') userId: string,
@@ -45,7 +45,7 @@ export class ClientsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Ubah data client' })
+  @ApiOperation({ summary: 'Update client data' })
   update(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -55,7 +55,7 @@ export class ClientsController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Hapus client (gagal jika masih punya invoice)' })
+  @ApiOperation({ summary: 'Delete client (fails if has invoices)' })
   remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.clientsService.remove(userId, id);
   }

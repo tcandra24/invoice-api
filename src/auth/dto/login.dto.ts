@@ -5,7 +5,7 @@ export class LoginDto {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
-  @IsEmail({}, { message: 'email tidak valid' })
+  @IsEmail({}, { message: 'email not valid' })
   email: string;
 
   @IsString()

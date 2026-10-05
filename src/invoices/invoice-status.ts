@@ -25,7 +25,7 @@ export const OPEN_STATUSES: InvoiceStatus[] = [
 export function assertTransition(from: InvoiceStatus, to: InvoiceStatus) {
   if (!ALLOWED_TRANSITIONS[from].includes(to)) {
     throw new BadRequestException(
-      `Status invoice tidak bisa berubah dari ${from} ke ${to}`,
+      `Invoice status cannot be changed from ${from} to ${to}`,
     );
   }
 }

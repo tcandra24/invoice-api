@@ -24,13 +24,13 @@ export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Buat invoice (status awal DRAFT)' })
+  @ApiOperation({ summary: 'Create invoice (initial status DRAFT)' })
   create(@CurrentUser('id') userId: string, @Body() dto: CreateInvoiceDto) {
     return this.invoicesService.create(userId, dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Daftar invoice, bisa difilter dengan ?status=' })
+  @ApiOperation({ summary: 'List invoices, can be filtered with ?status=' })
   findAll(@CurrentUser('id') userId: string, @Query() query: QueryInvoicesDto) {
     return this.invoicesService.findAll(userId, query);
   }
@@ -38,20 +38,20 @@ export class InvoicesController {
   // Harus di atas ':id', kalau tidak "summary" dianggap sebagai id
   @Get('summary')
   @ApiOperation({
-    summary: 'Ringkasan piutang, overdue, dan pendapatan bulan ini',
+    summary: 'Summary of receivables, overdue, and revenue for this month',
   })
   summary(@CurrentUser('id') userId: string) {
     return this.invoicesService.summary(userId);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detail invoice beserta item dan client' })
+  @ApiOperation({ summary: 'Invoice details, including items and client' })
   findOne(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.findOne(userId, id);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Ubah invoice (hanya saat DRAFT)' })
+  @ApiOperation({ summary: 'Update invoice (only when DRAFT)' })
   update(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -61,7 +61,7 @@ export class InvoicesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Hapus invoice (hanya saat DRAFT)' })
+  @ApiOperation({ summary: 'Remove invoice (only when DRAFT)' })
   remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.remove(userId, id);
   }
@@ -69,7 +69,7 @@ export class InvoicesController {
   @Post(':id/send')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Kirim invoice ke email client, status menjadi SENT',
+    summary: 'Send invoice to client email, status becomes SENT',
   })
   send(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.send(userId, id);
@@ -78,14 +78,14 @@ export class InvoicesController {
   @Post(':id/void')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Batalkan invoice (tanpa pembayaran, bukan PAID/VOID)',
+    summary: 'Cancel invoice (without payment, not PAID/VOID)',
   })
   void(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.void(userId, id);
   }
 
   @Post(':id/payments')
-  @ApiOperation({ summary: 'Catat pembayaran (boleh cicilan)' })
+  @ApiOperation({ summary: 'Record payment (installments allowed)' })
   addPayment(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -95,7 +95,7 @@ export class InvoicesController {
   }
 
   @Get(':id/payments')
-  @ApiOperation({ summary: 'Riwayat pembayaran sebuah invoice' })
+  @ApiOperation({ summary: 'Payment history of an invoice' })
   findPayments(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.findPayments(userId, id);
   }

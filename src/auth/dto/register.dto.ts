@@ -17,11 +17,11 @@ export class RegisterDto {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
-  @IsEmail({}, { message: 'email tidak valid' })
+  @IsEmail({}, { message: 'email not valid' })
   email: string;
 
   @IsString()
-  @MinLength(8, { message: 'password minimal 8 karakter' })
+  @MinLength(8, { message: 'password must be at least 8 characters' })
   @MaxLength(72)
   password: string;
 

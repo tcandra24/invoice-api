@@ -31,7 +31,7 @@ export class AuthService {
       where: { email: dto.email },
     });
     if (existing) {
-      throw new ConflictException('Email sudah terdaftar');
+      throw new ConflictException('Email already registered');
     }
 
     const hashed = await bcrypt.hash(dto.password, 10);
@@ -55,7 +55,7 @@ export class AuthService {
     // supaya orang tidak bisa mengecek email mana yang terdaftar.
     const valid = user && (await bcrypt.compare(dto.password, user.password));
     if (!user || !valid) {
-      throw new UnauthorizedException('Email atau password salah');
+      throw new UnauthorizedException('Email or password is incorrect');
     }
 
     const payload: JwtPayload = { sub: user.id, email: user.email };
@@ -76,7 +76,7 @@ export class AuthService {
       select: publicUserSelect,
     });
     if (!user) {
-      throw new NotFoundException('User tidak ditemukan');
+      throw new NotFoundException('User not found');
     }
     return user;
   }

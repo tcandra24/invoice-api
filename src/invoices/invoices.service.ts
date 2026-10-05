@@ -33,7 +33,7 @@ export class InvoicesService {
       where: { id: clientId, userId },
     });
     if (!client) {
-      throw new NotFoundException('Client tidak ditemukan');
+      throw new NotFoundException('Client not found');
     }
   }
 
@@ -50,7 +50,7 @@ export class InvoicesService {
 
   private assertDiscount(subtotal: Prisma.Decimal, discount: Prisma.Decimal) {
     if (discount.gt(subtotal)) {
-      throw new BadRequestException('Diskon tidak boleh melebihi subtotal');
+      throw new BadRequestException('Discount cannot exceed subtotal');
     }
   }
 
@@ -146,7 +146,7 @@ export class InvoicesService {
       include: { items: true, client: true },
     });
     if (!invoice) {
-      throw new NotFoundException(`Invoice dengan id ${id} tidak ditemukan`);
+      throw new NotFoundException(`Invoice with id ${id} not found`);
     }
     return invoice;
   }
@@ -155,7 +155,7 @@ export class InvoicesService {
     const invoice = await this.findOne(userId, id);
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException(
-        'Hanya invoice berstatus DRAFT yang boleh diubah',
+        'Only invoices with DRAFT status can be updated',
       );
     }
 
@@ -196,11 +196,11 @@ export class InvoicesService {
     const invoice = await this.findOne(userId, id);
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException(
-        'Hanya invoice berstatus DRAFT yang boleh dihapus',
+        'Only invoices with DRAFT status can be deleted',
       );
     }
     await this.prisma.invoice.delete({ where: { id } });
-    return { message: `Invoice ${id} berhasil dihapus` };
+    return { message: `Invoice ${id} successfully deleted` };
   }
 
   // ---------- Perubahan status ----------
@@ -211,12 +211,12 @@ export class InvoicesService {
 
     if (daysUntil(invoice.dueDate) < 0) {
       throw new BadRequestException(
-        'Tanggal jatuh tempo sudah lewat, ubah dueDate sebelum mengirim',
+        'The due date has passed, change the dueDate before sending',
       );
     }
     if (!invoice.client.email) {
       throw new BadRequestException(
-        'Client belum punya email, lengkapi data client terlebih dahulu',
+        'Client does not have an email, please complete client data first',
       );
     }
 
@@ -240,7 +240,7 @@ export class InvoicesService {
     });
     if (paymentCount > 0) {
       throw new BadRequestException(
-        'Invoice yang sudah punya pembayaran tidak bisa dibatalkan',
+        'Invoices that already have payments cannot be cancelled',
       );
     }
 
@@ -258,11 +258,11 @@ export class InvoicesService {
       async (tx) => {
         const invoice = await tx.invoice.findFirst({ where: { id, userId } });
         if (!invoice) {
-          throw new NotFoundException(`Invoice dengan id ${id} tidak ditemukan`);
+          throw new NotFoundException(`Invoice with id ${id} not found`);
         }
         if (!PAYABLE_STATUSES.includes(invoice.status)) {
           throw new BadRequestException(
-            `Invoice berstatus ${invoice.status} tidak bisa menerima pembayaran`,
+            `Invoice with status ${invoice.status} cannot accept payments`,
           );
         }
 
@@ -276,7 +276,7 @@ export class InvoicesService {
 
         if (amount.gt(remaining)) {
           throw new BadRequestException(
-            `Pembayaran melebihi sisa tagihan (sisa: ${remaining.toFixed(2)})`,
+            `Payment exceeds remaining invoice amount (remaining: ${remaining.toFixed(2)})`,
           );
         }
 

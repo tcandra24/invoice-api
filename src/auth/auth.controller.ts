@@ -15,7 +15,7 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
-  @ApiOperation({ summary: 'Daftar akun pemilik usaha' })
+  @ApiOperation({ summary: 'Register a business owner account' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -23,14 +23,14 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
-  @ApiOperation({ summary: 'Login dan dapatkan access token (JWT)' })
+  @ApiOperation({ summary: 'Login and get access token (JWT)' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @ApiBearerAuth()
   @Get('me')
-  @ApiOperation({ summary: 'Profil user yang sedang login' })
+  @ApiOperation({ summary: 'Profile of the logged-in user' })
   me(@CurrentUser('id') userId: string) {
     return this.authService.me(userId);
   }

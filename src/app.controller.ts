@@ -10,7 +10,7 @@ export class AppController {
 
   @Public()
   @Get('health')
-  @ApiOperation({ summary: 'Cek status API dan koneksi database' })
+  @ApiOperation({ summary: 'Check status API and database connection' })
   async health() {
     await this.prisma.$queryRaw`SELECT 1`;
     return { status: 'ok' };

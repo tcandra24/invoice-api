@@ -14,12 +14,12 @@ export class CreateClientDto {
   name: string;
 
   @IsOptional()
-  @IsEmail({}, { message: 'email tidak valid' })
+  @IsEmail({}, { message: 'email not valid' })
   email?: string;
 
   @IsOptional()
   @Matches(/^(\+62|62|0)8[0-9]{8,11}$/, {
-    message: 'phone harus berupa nomor HP Indonesia yang valid',
+    message: 'phone must be a valid Indonesian mobile number',
   })
   phone?: string;
 

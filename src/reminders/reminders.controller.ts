@@ -22,12 +22,12 @@ export class RemindersController {
   @HttpCode(200)
   @ApiOperation({
     summary:
-      'Jalankan overdue + reminder secara manual untuk invoice milik user (asOf hanya non-production)',
+      'Manually run overdue processing and reminders for user invoices (asOf applies only to non-production environments)',
   })
   run(@CurrentUser('id') userId: string, @Query() query: RunRemindersDto) {
     if (query.asOf && process.env.NODE_ENV === 'production') {
       throw new ForbiddenException(
-        'Simulasi tanggal (asOf) tidak tersedia di production',
+        'Date simulation (asOf) is not available in production',
       );
     }
     return this.remindersService.run(
@@ -37,7 +37,7 @@ export class RemindersController {
   }
 
   @Get('invoice/:invoiceId')
-  @ApiOperation({ summary: 'Riwayat pengiriman email untuk sebuah invoice' })
+  @ApiOperation({ summary: 'Email delivery history for a specific invoice' })
   findLogs(
     @CurrentUser('id') userId: string,
     @Param('invoiceId') invoiceId: string,

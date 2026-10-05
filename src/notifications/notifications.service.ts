@@ -39,7 +39,7 @@ export class NotificationsService {
       this.transporter = null;
       this.channel = 'LOG';
       this.logger.warn(
-        'SMTP_HOST kosong: email hanya dicetak ke log (mode mock)',
+        'SMTP_HOST empty: email is only printed to the log (mode mock)',
       );
     }
   }

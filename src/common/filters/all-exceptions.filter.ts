@@ -19,7 +19,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const req = ctx.getRequest<Request>();
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message: string | string[] = 'Terjadi kesalahan pada server';
+    let message: string | string[] = 'A server error occurred';
 
     if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
@@ -33,20 +33,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
       switch (exception.code) {
         case 'P2002':
           statusCode = HttpStatus.CONFLICT;
-          message = 'Data sudah ada (duplikat)';
+          message = 'Data already exists (duplicate)';
           break;
         case 'P2003':
           statusCode = HttpStatus.CONFLICT;
           message =
-            'Data tidak bisa diproses karena masih berelasi dengan data lain atau referensi tidak valid';
+            'Data cannot be processed because it is still related to other data or the reference is invalid';
           break;
         case 'P2025':
           statusCode = HttpStatus.NOT_FOUND;
-          message = 'Data tidak ditemukan';
+          message = 'Data not found';
           break;
         case 'P2034':
           statusCode = HttpStatus.CONFLICT;
-          message = 'Terjadi bentrokan proses, silakan coba lagi';
+          message = 'A process conflict occurred, please try again';
           break;
         default:
           this.logger.error(`Prisma error ${exception.code}`, exception.stack);

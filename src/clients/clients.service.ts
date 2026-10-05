@@ -45,7 +45,7 @@ export class ClientsService {
       where: { id, userId },
     });
     if (!client) {
-      throw new NotFoundException(`Client dengan id ${id} tidak ditemukan`);
+      throw new NotFoundException(`Client with id ${id} not found`);
     }
     return client;
   }
@@ -58,6 +58,6 @@ export class ClientsService {
   async remove(userId: string, id: string) {
     await this.findOne(userId, id);
     await this.prisma.client.delete({ where: { id } });
-    return { message: `Client ${id} berhasil dihapus` };
+    return { message: `Client ${id} successfully deleted` };
   }
 }

@@ -26,18 +26,18 @@ export interface InvoiceEmailData {
 export function buildInvoiceEmail(d: InvoiceEmailData) {
   const subjects: Record<ReminderStage, string> = {
     INITIAL: `Invoice ${d.number} dari ${d.businessName}`,
-    BEFORE_3: `Pengingat: invoice ${d.number} jatuh tempo 3 hari lagi`,
-    ON_DUE: `Invoice ${d.number} jatuh tempo hari ini`,
-    AFTER_3: `Invoice ${d.number} terlambat 3 hari`,
-    AFTER_7: `Invoice ${d.number} terlambat 7 hari`,
+    BEFORE_3: `Reminder: invoice ${d.number} due in 3 days`,
+    ON_DUE: `Invoice ${d.number} due today`,
+    AFTER_3: `Invoice ${d.number} late 3 days`,
+    AFTER_7: `Invoice ${d.number} late 7 days`,
   };
 
   const intros: Record<ReminderStage, string> = {
-    INITIAL: `Berikut invoice ${d.number} untuk Anda.`,
-    BEFORE_3: `Pengingat ramah: invoice ${d.number} akan jatuh tempo dalam 3 hari.`,
-    ON_DUE: `Invoice ${d.number} jatuh tempo hari ini.`,
-    AFTER_3: `Invoice ${d.number} sudah melewati jatuh tempo 3 hari.`,
-    AFTER_7: `Invoice ${d.number} sudah melewati jatuh tempo 7 hari.`,
+    INITIAL: `Here is the invoice ${d.number} for You.`,
+    BEFORE_3: `Friendly reminder: invoice ${d.number} will be due in 3 days.`,
+    ON_DUE: `Invoice ${d.number} is due today.`,
+    AFTER_3: `Invoice ${d.number} is late 3 days.`,
+    AFTER_7: `Invoice ${d.number} is late 7 days.`,
   };
 
   const due = formatDateId(d.dueDate);
@@ -51,24 +51,24 @@ export function buildInvoiceEmail(d: InvoiceEmailData) {
     '',
     intros[d.stage],
     '',
-    'Rincian:',
+    'Details:',
     ...d.items.map(
       (i) =>
         `- ${i.description}: ${i.quantity} x ${formatRupiah(i.unitPrice)} = ${formatRupiah(i.amount)}`,
     ),
     '',
-    ...(hasDiscount ? [`Diskon: ${formatRupiah(d.discount)}`] : []),
-    ...(hasTax ? [`Pajak: ${formatRupiah(d.tax)}`] : []),
+    ...(hasDiscount ? [`Discount: ${formatRupiah(d.discount)}`] : []),
+    ...(hasTax ? [`Tax: ${formatRupiah(d.tax)}`] : []),
     `Total: ${formatRupiah(d.total)}`,
-    ...(hasPaid ? [`Sudah dibayar: ${formatRupiah(d.paid)}`] : []),
-    `Sisa tagihan: ${formatRupiah(d.remaining)}`,
-    `Jatuh tempo: ${due}`,
-    ...(d.notes ? ['', `Catatan: ${d.notes}`] : []),
+    ...(hasPaid ? [`Paid: ${formatRupiah(d.paid)}`] : []),
+    `Remaining: ${formatRupiah(d.remaining)}`,
+    `Due: ${due}`,
+    ...(d.notes ? ['', `Note: ${d.notes}`] : []),
     '',
-    'Jika Anda sudah membayar, abaikan pesan ini.',
-    `Pertanyaan? Balas email ini atau hubungi ${d.ownerEmail}.`,
+    'If you have already paid, please disregard this message.',
+    `Questions? Reply to this email or contact ${d.ownerEmail}.`,
     '',
-    'Salam,',
+    'Best regards,',
     d.businessName,
   ];
 
@@ -98,24 +98,24 @@ export function buildInvoiceEmail(d: InvoiceEmailData) {
         <tr style="background:#f5f5f5">
           <th style="padding:6px 8px;text-align:left">Item</th>
           <th style="padding:6px 8px">Qty</th>
-          <th style="padding:6px 8px;text-align:right">Harga</th>
-          <th style="padding:6px 8px;text-align:right">Jumlah</th>
+          <th style="padding:6px 8px;text-align:right">Price</th>
+          <th style="padding:6px 8px;text-align:right">Amount</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
       <tfoot>
-        ${hasDiscount ? summaryRow('Diskon', formatRupiah(d.discount)) : ''}
-        ${hasTax ? summaryRow('Pajak', formatRupiah(d.tax)) : ''}
+        ${hasDiscount ? summaryRow('Discount', formatRupiah(d.discount)) : ''}
+        ${hasTax ? summaryRow('Tax', formatRupiah(d.tax)) : ''}
         ${summaryRow('Total', formatRupiah(d.total))}
-        ${hasPaid ? summaryRow('Sudah dibayar', formatRupiah(d.paid)) : ''}
-        ${summaryRow('Sisa tagihan', formatRupiah(d.remaining), true)}
+        ${hasPaid ? summaryRow('Paid', formatRupiah(d.paid)) : ''}
+        ${summaryRow('Remaining', formatRupiah(d.remaining), true)}
       </tfoot>
     </table>
-    <p><strong>Jatuh tempo:</strong> ${escapeHtml(due)}</p>
-    ${d.notes ? `<p><strong>Catatan:</strong> ${escapeHtml(d.notes)}</p>` : ''}
-    <p style="color:#666;font-size:13px">Jika Anda sudah membayar, abaikan pesan ini.
-    Pertanyaan? Balas email ini atau hubungi ${escapeHtml(d.ownerEmail)}.</p>
-    <p>Salam,<br>${escapeHtml(d.businessName)}</p>
+    <p><strong>Due:</strong> ${escapeHtml(due)}</p>
+    ${d.notes ? `<p><strong>Note:</strong> ${escapeHtml(d.notes)}</p>` : ''}
+    <p style="color:#666;font-size:13px">If you have already paid, please disregard this message.
+    Questions? Reply to this email or contact ${escapeHtml(d.ownerEmail)}.</p>
+    <p>Best regards,<br>${escapeHtml(d.businessName)}</p>
   </div>`;
 
   return {

@@ -49,7 +49,7 @@ export class RemindersService {
 
     const recipient = invoice.client.email;
     if (!recipient) {
-      throw new BadRequestException('Client belum punya email');
+      throw new BadRequestException('Client have no email');
     }
 
     const paid = invoice.payments.reduce(
@@ -92,7 +92,7 @@ export class RemindersService {
           error: message.slice(0, 500),
         },
       });
-      throw new BadGatewayException('Gagal mengirim email ke client');
+      throw new BadGatewayException('Failed to send email to client');
     }
 
     await this.prisma.reminderLog.create({
@@ -107,10 +107,10 @@ export class RemindersService {
   async handleCron() {
     try {
       const result = await this.run();
-      this.logger.log(`Cron reminder selesai: ${JSON.stringify(result)}`);
+      this.logger.log(`Cron reminder done: ${JSON.stringify(result)}`);
     } catch (error) {
       this.logger.error(
-        'Cron reminder gagal',
+        'Cron reminder failed',
         error instanceof Error ? error.stack : String(error),
       );
     }
@@ -158,7 +158,7 @@ export class RemindersService {
       } catch (error) {
         result.failed++;
         this.logger.error(
-          `Reminder ${stage} untuk invoice ${invoice.number} gagal: ${
+          `Reminder ${stage} for invoice ${invoice.number} failed: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
@@ -188,9 +188,7 @@ export class RemindersService {
       select: { id: true },
     });
     if (!invoice) {
-      throw new NotFoundException(
-        `Invoice dengan id ${invoiceId} tidak ditemukan`,
-      );
+      throw new NotFoundException(`Invoice with id ${invoiceId} not found`);
     }
     return this.prisma.reminderLog.findMany({
       where: { invoiceId },
