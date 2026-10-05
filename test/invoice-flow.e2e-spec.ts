@@ -258,7 +258,8 @@ describe('Invoice API (e2e)', () => {
         .get('/invoices')
         .set('Authorization', `Bearer ${tokenB}`)
         .expect(200);
-      expect(list.body.data).toEqual([]);
+      expect(list.body.data.items).toEqual([]);
+      expect(list.body.data.meta.total).toBe(0);
     });
 
     it('user B tidak bisa mencatat pembayaran di invoice user A', () => {

@@ -6,11 +6,13 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
+import { QueryClientsDto } from './dto/query-clients.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 
 @ApiTags('clients')
@@ -26,9 +28,14 @@ export class ClientsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Daftar client milik user' })
-  findAll(@CurrentUser('id') userId: string) {
-    return this.clientsService.findAll(userId);
+  @ApiOperation({
+    summary: 'Daftar client milik user (pagination + pencarian nama/email)',
+  })
+  findAll(
+    @CurrentUser('id') userId: string,
+    @Query() query: QueryClientsDto,
+  ) {
+    return this.clientsService.findAll(userId, query);
   }
 
   @Get(':id')

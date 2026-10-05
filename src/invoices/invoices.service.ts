@@ -4,12 +4,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { daysUntil } from '../common/date.util';
+import { paginate, skipTake } from '../common/pagination.util';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RemindersService } from '../reminders/reminders.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { QueryInvoicesDto } from './dto/query-invoices.dto';
+import { InvoiceSortField, QueryInvoicesDto } from './dto/query-invoices.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { calculateInvoice } from './invoice-calculator';
 import {
@@ -53,6 +54,21 @@ export class InvoicesService {
     }
   }
 
+  private buildOrderBy(
+    sortBy: InvoiceSortField,
+    order: 'asc' | 'desc',
+  ): Prisma.InvoiceOrderByWithRelationInput[] {
+    const primary: Prisma.InvoiceOrderByWithRelationInput =
+      sortBy === 'dueDate'
+        ? { dueDate: order }
+        : sortBy === 'total'
+          ? { total: order }
+          : { createdAt: order };
+
+    // id sebagai pengurut kedua agar urutan antar halaman stabil
+    return [primary, { id: 'asc' }];
+  }
+
   // ---------- CRUD ----------
 
   async create(userId: string, dto: CreateInvoiceDto) {
@@ -80,12 +96,48 @@ export class InvoicesService {
     });
   }
 
-  findAll(userId: string, query: QueryInvoicesDto) {
-    return this.prisma.invoice.findMany({
-      where: { userId, ...(query.status && { status: query.status }) },
-      include: { client: true },
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(userId: string, query: QueryInvoicesDto) {
+    const {
+      page,
+      limit,
+      status,
+      clientId,
+      search,
+      dueFrom,
+      dueTo,
+      sortBy,
+      order,
+    } = query;
+
+    const where: Prisma.InvoiceWhereInput = {
+      userId,
+      ...(status && { status }),
+      ...(clientId && { clientId }),
+      ...((dueFrom || dueTo) && {
+        dueDate: {
+          ...(dueFrom && { gte: new Date(dueFrom) }),
+          ...(dueTo && { lte: new Date(dueTo) }),
+        },
+      }),
+      ...(search && {
+        OR: [
+          { number: { contains: search, mode: 'insensitive' } },
+          { client: { name: { contains: search, mode: 'insensitive' } } },
+        ],
+      }),
+    };
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.invoice.findMany({
+        where,
+        include: { client: true },
+        orderBy: this.buildOrderBy(sortBy, order),
+        ...skipTake(page, limit),
+      }),
+      this.prisma.invoice.count({ where }),
+    ]);
+
+    return paginate(items, total, page, limit);
   }
 
   async findOne(userId: string, id: string) {
@@ -206,9 +258,7 @@ export class InvoicesService {
       async (tx) => {
         const invoice = await tx.invoice.findFirst({ where: { id, userId } });
         if (!invoice) {
-          throw new NotFoundException(
-            `Invoice dengan id ${id} tidak ditemukan`,
-          );
+          throw new NotFoundException(`Invoice dengan id ${id} tidak ditemukan`);
         }
         if (!PAYABLE_STATUSES.includes(invoice.status)) {
           throw new BadRequestException(
