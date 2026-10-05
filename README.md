@@ -296,7 +296,3 @@ SMTP_HOST=
 - Belum ada verifikasi email dan reset password.
 - Cron berjalan di dalam aplikasi, jadi belum aman untuk banyak instance (rencana: antrian BullMQ).
 - Belum ada PDF invoice, halaman invoice publik untuk client, channel WhatsApp, dan payment gateway.
-
-## Lisensi
-
-Proyek pembelajaran. Silakan dipakai sebagai referensi.
