@@ -10,7 +10,10 @@ import { AuthService } from './auth.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1d' },
+        // Access token pendek. Refresh token yang menjaga sesi tetap hidup.
+        signOptions: {
+          expiresIn: Number(config.get('JWT_ACCESS_TTL_SECONDS') ?? 900),
+        },
       }),
     }),
   ],

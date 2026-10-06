@@ -12,6 +12,8 @@ const envSchema = z
       .min(1, 'required')
       .startsWith('postgres', 'must be a PostgreSQL URL'),
     JWT_SECRET: z.string().min(16, 'at least 16 characters'),
+    JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
     CORS_ORIGINS: z.string().optional(),
     SWAGGER_ENABLED: z.enum(['true', 'false']).optional(),
