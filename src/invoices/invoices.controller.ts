@@ -11,8 +11,23 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { MessageResponseDto } from '../common/dto/message-response.dto';
+import {
+  ApiErrorResponses,
+  ApiPaginatedResponse,
+  ApiWrappedResponse,
+} from '../common/swagger/api-responses';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import {
+  InvoiceDetailResponseDto,
+  InvoiceSummaryResponseDto,
+  InvoiceWithClientResponseDto,
+} from './dto/invoice-response.dto';
+import {
+  PaymentResponseDto,
+  PaymentResultResponseDto,
+} from './dto/payment-response.dto';
 import { QueryInvoicesDto } from './dto/query-invoices.dto';
 import { QueryPaymentsDto } from './dto/query-payments.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
@@ -22,12 +37,15 @@ import { InvoicesService } from './invoices.service';
 
 @ApiTags('invoices')
 @ApiBearerAuth()
+@ApiErrorResponses(400, 401, 429)
 @Controller('invoices')
 export class InvoicesController {
   constructor(private readonly invoicesService: InvoicesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create invoice (initial status DRAFT)' })
+  @ApiWrappedResponse(InvoiceDetailResponseDto, { status: 201 })
+  @ApiErrorResponses(404)
   create(@CurrentUser('id') userId: string, @Body() dto: CreateInvoiceDto) {
     return this.invoicesService.create(userId, dto);
   }
@@ -36,6 +54,7 @@ export class InvoicesController {
   @ApiOperation({
     summary: 'List invoices (pagination, filter, search, sorting)',
   })
+  @ApiPaginatedResponse(InvoiceWithClientResponseDto)
   findAll(@CurrentUser('id') userId: string, @Query() query: QueryInvoicesDto) {
     return this.invoicesService.findAll(userId, query);
   }
@@ -45,18 +64,23 @@ export class InvoicesController {
   @ApiOperation({
     summary: 'Summary of receivables, overdue, and revenue for this month',
   })
+  @ApiWrappedResponse(InvoiceSummaryResponseDto)
   summary(@CurrentUser('id') userId: string) {
     return this.invoicesService.summary(userId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Invoice details, including items and client' })
+  @ApiWrappedResponse(InvoiceDetailResponseDto)
+  @ApiErrorResponses(404)
   findOne(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.findOne(userId, id);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update invoice (only when DRAFT)' })
+  @ApiWrappedResponse(InvoiceDetailResponseDto)
+  @ApiErrorResponses(404)
   update(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -67,6 +91,8 @@ export class InvoicesController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Remove invoice (only when DRAFT)' })
+  @ApiWrappedResponse(MessageResponseDto)
+  @ApiErrorResponses(404)
   remove(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.remove(userId, id);
   }
@@ -76,6 +102,8 @@ export class InvoicesController {
   @ApiOperation({
     summary: 'Send invoice to client email, status becomes SENT',
   })
+  @ApiWrappedResponse(InvoiceDetailResponseDto)
+  @ApiErrorResponses(404, 502)
   send(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.send(userId, id);
   }
@@ -85,6 +113,8 @@ export class InvoicesController {
   @ApiOperation({
     summary: 'Void invoice (without active payments, not PAID/VOID)',
   })
+  @ApiWrappedResponse(InvoiceDetailResponseDto)
+  @ApiErrorResponses(404, 502)
   void(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.void(userId, id);
   }
@@ -93,6 +123,8 @@ export class InvoicesController {
 
   @Post(':id/payments')
   @ApiOperation({ summary: 'Record payment (installments allowed)' })
+  @ApiWrappedResponse(PaymentResultResponseDto, { status: 201 })
+  @ApiErrorResponses(404, 409)
   addPayment(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -106,6 +138,8 @@ export class InvoicesController {
     summary:
       'History of invoice payments (voided ones are hidden, use ?includeVoided=true to show)',
   })
+  @ApiWrappedResponse(PaymentResponseDto, { isArray: true })
+  @ApiErrorResponses(404)
   findPayments(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -116,6 +150,8 @@ export class InvoicesController {
 
   @Get(':id/payments/:paymentId')
   @ApiOperation({ summary: 'Detail one payment' })
+  @ApiWrappedResponse(PaymentResponseDto)
+  @ApiErrorResponses(404)
   findPayment(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -129,6 +165,8 @@ export class InvoicesController {
     summary:
       'Update payment (amount, method, date, notes). Invoice status will be recalculated',
   })
+  @ApiWrappedResponse(PaymentResultResponseDto)
+  @ApiErrorResponses(404, 409)
   updatePayment(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
@@ -143,6 +181,8 @@ export class InvoicesController {
     summary:
       'Void payment (soft delete, reason optional in body). Invoice status will be recalculated',
   })
+  @ApiWrappedResponse(PaymentResultResponseDto)
+  @ApiErrorResponses(404, 409)
   voidPayment(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
