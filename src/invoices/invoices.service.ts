@@ -5,19 +5,37 @@ import {
 } from '@nestjs/common';
 import { daysUntil } from '../common/date.util';
 import { paginate, skipTake } from '../common/pagination.util';
-import { Prisma } from '../generated/prisma/client';
+import { InvoiceStatus, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RemindersService } from '../reminders/reminders.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { InvoiceSortField, QueryInvoicesDto } from './dto/query-invoices.dto';
+import { QueryPaymentsDto } from './dto/query-payments.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { UpdatePaymentDto } from './dto/update-payment.dto';
+import { VoidPaymentDto } from './dto/void-payment.dto';
 import { calculateInvoice } from './invoice-calculator';
 import {
   OPEN_STATUSES,
   PAYABLE_STATUSES,
+  PAYMENT_EDITABLE_STATUSES,
   assertTransition,
+  deriveInvoiceStatus,
 } from './invoice-status';
+
+interface InvoiceForRecalc {
+  id: string;
+  number: string;
+  status: InvoiceStatus;
+  total: Prisma.Decimal;
+  dueDate: Date;
+  paidAt: Date | null;
+}
+
+const SERIALIZABLE = {
+  isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+};
 
 @Injectable()
 export class InvoicesService {
@@ -67,6 +85,82 @@ export class InvoicesService {
 
     // id sebagai pengurut kedua agar urutan antar halaman stabil
     return [primary, { id: 'asc' }];
+  }
+
+  /**
+   * Menghitung ulang status dan paidAt invoice dari pembayaran AKTIF
+   * (yang belum dibatalkan). Dipakai bersama oleh tambah, ubah, dan batal
+   * pembayaran, sehingga aturannya hanya ada di satu tempat.
+   */
+  private async recalculateInvoice(
+    tx: Prisma.TransactionClient,
+    invoice: InvoiceForRecalc,
+  ) {
+    const agg = await tx.payment.aggregate({
+      where: { invoiceId: invoice.id, voidedAt: null },
+      _sum: { amount: true },
+      _max: { paidAt: true },
+    });
+
+    const totalPaid = agg._sum.amount ?? new Prisma.Decimal(0);
+    const status = deriveInvoiceStatus({
+      total: invoice.total,
+      totalPaid,
+      dueDate: invoice.dueDate,
+    });
+    // Tanggal lunas = tanggal pembayaran terakhir. Kosong jika tidak lunas.
+    const paidAt = status === 'PAID' ? (agg._max.paidAt ?? null) : null;
+
+    const paidAtChanged =
+      (invoice.paidAt?.getTime() ?? null) !== (paidAt?.getTime() ?? null);
+
+    if (status !== invoice.status || paidAtChanged) {
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: { status, paidAt },
+      });
+    }
+
+    return {
+      id: invoice.id,
+      number: invoice.number,
+      status,
+      total: invoice.total,
+      totalPaid,
+      remaining: invoice.total.sub(totalPaid),
+    };
+  }
+
+  /** Memuat invoice milik user + pembayaran aktif yang akan diubah atau dibatalkan. */
+  private async loadActivePayment(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    invoiceId: string,
+    paymentId: string,
+  ) {
+    const invoice = await tx.invoice.findFirst({
+      where: { id: invoiceId, userId },
+    });
+    if (!invoice) {
+      throw new NotFoundException(`Invoice with id ${invoiceId} not found`);
+    }
+    if (!PAYMENT_EDITABLE_STATUSES.includes(invoice.status)) {
+      throw new BadRequestException(
+        `Payment on invoice with status ${invoice.status} cannot be changed`,
+      );
+    }
+
+    const payment = await tx.payment.findFirst({
+      where: { id: paymentId, invoiceId },
+    });
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+    if (payment.voidedAt) {
+      throw new BadRequestException('Payment has been voided');
+    }
+
+    return { invoice, payment };
   }
 
   // ---------- CRUD ----------
@@ -155,7 +249,7 @@ export class InvoicesService {
     const invoice = await this.findOne(userId, id);
     if (invoice.status !== 'DRAFT') {
       throw new BadRequestException(
-        'Only invoices with DRAFT status can be updated',
+        'Only invoices with DRAFT status can be changed',
       );
     }
 
@@ -235,12 +329,13 @@ export class InvoicesService {
     const invoice = await this.findOne(userId, id);
     assertTransition(invoice.status, 'VOID');
 
-    const paymentCount = await this.prisma.payment.count({
-      where: { invoiceId: id },
+    // Hanya pembayaran aktif yang menghalangi pembatalan invoice
+    const activePayments = await this.prisma.payment.count({
+      where: { invoiceId: id, voidedAt: null },
     });
-    if (paymentCount > 0) {
+    if (activePayments > 0) {
       throw new BadRequestException(
-        'Invoices that already have payments cannot be cancelled',
+        'Invoice with active payments cannot be voided',
       );
     }
 
@@ -254,82 +349,143 @@ export class InvoicesService {
   // ---------- Pembayaran ----------
 
   async addPayment(userId: string, id: string, dto: CreatePaymentDto) {
-    return this.prisma.$transaction(
-      async (tx) => {
-        const invoice = await tx.invoice.findFirst({ where: { id, userId } });
-        if (!invoice) {
-          throw new NotFoundException(`Invoice with id ${id} not found`);
-        }
-        if (!PAYABLE_STATUSES.includes(invoice.status)) {
-          throw new BadRequestException(
-            `Invoice with status ${invoice.status} cannot accept payments`,
-          );
-        }
+    return this.prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({ where: { id, userId } });
+      if (!invoice) {
+        throw new NotFoundException(`Invoice with id ${id} not found`);
+      }
+      if (!PAYABLE_STATUSES.includes(invoice.status)) {
+        throw new BadRequestException(
+          `Invoice with status ${invoice.status} cannot accept payments`,
+        );
+      }
 
-        const agg = await tx.payment.aggregate({
-          where: { invoiceId: id },
-          _sum: { amount: true },
-        });
-        const alreadyPaid = agg._sum.amount ?? new Prisma.Decimal(0);
-        const remaining = invoice.total.sub(alreadyPaid);
-        const amount = new Prisma.Decimal(dto.amount);
+      // Only active payments are counted
+      const agg = await tx.payment.aggregate({
+        where: { invoiceId: id, voidedAt: null },
+        _sum: { amount: true },
+      });
+      const alreadyPaid = agg._sum.amount ?? new Prisma.Decimal(0);
+      const remaining = invoice.total.sub(alreadyPaid);
+      const amount = new Prisma.Decimal(dto.amount);
 
-        if (amount.gt(remaining)) {
-          throw new BadRequestException(
-            `Payment exceeds remaining invoice amount (remaining: ${remaining.toFixed(2)})`,
-          );
-        }
+      if (amount.gt(remaining)) {
+        throw new BadRequestException(
+          `Payment exceeds remaining invoice amount (remaining: ${remaining.toFixed(2)})`,
+        );
+      }
 
-        const payment = await tx.payment.create({
-          data: {
-            invoiceId: id,
-            amount,
-            method: dto.method,
-            paidAt: dto.paidAt ? new Date(dto.paidAt) : undefined,
-            note: dto.note,
-          },
-        });
+      const payment = await tx.payment.create({
+        data: {
+          invoiceId: id,
+          amount,
+          method: dto.method,
+          paidAt: dto.paidAt ? new Date(dto.paidAt) : undefined,
+          note: dto.note,
+        },
+      });
 
-        const totalPaid = alreadyPaid.add(amount);
-        const fullyPaid = totalPaid.gte(invoice.total);
-
-        let status = invoice.status;
-        if (fullyPaid) {
-          status = 'PAID';
-        } else if (invoice.status === 'SENT') {
-          status = 'PARTIALLY_PAID';
-        }
-
-        if (status !== invoice.status) {
-          assertTransition(invoice.status, status);
-          await tx.invoice.update({
-            where: { id },
-            data: { status, paidAt: fullyPaid ? payment.paidAt : null },
-          });
-        }
-
-        return {
-          payment,
-          invoice: {
-            id,
-            number: invoice.number,
-            status,
-            total: invoice.total,
-            totalPaid,
-            remaining: invoice.total.sub(totalPaid),
-          },
-        };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+      const summary = await this.recalculateInvoice(tx, invoice);
+      return { payment, invoice: summary };
+    }, SERIALIZABLE);
   }
 
-  async findPayments(userId: string, id: string) {
+  async findPayments(userId: string, id: string, query: QueryPaymentsDto) {
     await this.findOne(userId, id);
     return this.prisma.payment.findMany({
-      where: { invoiceId: id },
+      where: {
+        invoiceId: id,
+        ...(query.includeVoided !== 'true' && { voidedAt: null }),
+      },
       orderBy: { paidAt: 'desc' },
     });
+  }
+
+  async findPayment(userId: string, id: string, paymentId: string) {
+    await this.findOne(userId, id);
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, invoiceId: id },
+    });
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+    return payment;
+  }
+
+  async updatePayment(
+    userId: string,
+    invoiceId: string,
+    paymentId: string,
+    dto: UpdatePaymentDto,
+  ) {
+    if (Object.values(dto).every((value) => value === undefined)) {
+      throw new BadRequestException('At least one field must be filled');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const { invoice } = await this.loadActivePayment(
+        tx,
+        userId,
+        invoiceId,
+        paymentId,
+      );
+
+      // New amount + other active payments must not exceed total
+      if (dto.amount !== undefined) {
+        const others = await tx.payment.aggregate({
+          where: { invoiceId, voidedAt: null, id: { not: paymentId } },
+          _sum: { amount: true },
+        });
+        const maxAllowed = invoice.total.sub(
+          others._sum.amount ?? new Prisma.Decimal(0),
+        );
+        if (new Prisma.Decimal(dto.amount).gt(maxAllowed)) {
+          throw new BadRequestException(
+            `Payment exceeds remaining invoice amount (maximum: ${maxAllowed.toFixed(2)})`,
+          );
+        }
+      }
+
+      const payment = await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          amount:
+            dto.amount !== undefined
+              ? new Prisma.Decimal(dto.amount)
+              : undefined,
+          method: dto.method,
+          paidAt: dto.paidAt ? new Date(dto.paidAt) : undefined,
+          note: dto.note,
+        },
+      });
+
+      const summary = await this.recalculateInvoice(tx, invoice);
+      return { payment, invoice: summary };
+    }, SERIALIZABLE);
+  }
+
+  async voidPayment(
+    userId: string,
+    invoiceId: string,
+    paymentId: string,
+    dto: VoidPaymentDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const { invoice } = await this.loadActivePayment(
+        tx,
+        userId,
+        invoiceId,
+        paymentId,
+      );
+
+      const payment = await tx.payment.update({
+        where: { id: paymentId },
+        data: { voidedAt: new Date(), voidReason: dto?.reason },
+      });
+
+      const summary = await this.recalculateInvoice(tx, invoice);
+      return { payment, invoice: summary };
+    }, SERIALIZABLE);
   }
 
   // ---------- Ringkasan ----------
@@ -347,12 +503,19 @@ export class InvoicesService {
           _count: true,
         }),
         this.prisma.payment.aggregate({
-          where: { invoice: { userId, status: { in: OPEN_STATUSES } } },
+          where: {
+            voidedAt: null,
+            invoice: { userId, status: { in: OPEN_STATUSES } },
+          },
           _sum: { amount: true },
         }),
         this.prisma.invoice.count({ where: { userId, status: 'OVERDUE' } }),
         this.prisma.payment.aggregate({
-          where: { invoice: { userId }, paidAt: { gte: monthStart } },
+          where: {
+            voidedAt: null,
+            invoice: { userId },
+            paidAt: { gte: monthStart },
+          },
           _sum: { amount: true },
         }),
       ],

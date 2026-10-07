@@ -134,13 +134,16 @@ model InvoiceItem {
 }
 
 model Payment {
-  id        String   @id @default(cuid())
-  invoiceId String
-  amount    Decimal  @db.Decimal(14, 2)
-  method    String?
-  paidAt    DateTime @default(now())
-  note      String?
-  createdAt DateTime @default(now())
+  id         String    @id @default(cuid())
+  invoiceId  String
+  amount     Decimal   @db.Decimal(14, 2)
+  method     String?
+  paidAt     DateTime  @default(now())
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+  voidedAt   DateTime?
+  voidReason String?
 
   invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 

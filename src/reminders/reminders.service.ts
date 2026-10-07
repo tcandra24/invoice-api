@@ -44,7 +44,12 @@ export class RemindersService {
   async sendNotice(invoiceId: string, stage: ReminderStage) {
     const invoice = await this.prisma.invoice.findUniqueOrThrow({
       where: { id: invoiceId },
-      include: { client: true, user: true, items: true, payments: true },
+      include: {
+        client: true,
+        user: true,
+        items: true,
+        payments: { where: { voidedAt: null } },
+      },
     });
 
     const recipient = invoice.client.email;
