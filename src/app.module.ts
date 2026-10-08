@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RemindersModule } from './reminders/reminders.module';
 import { validateEnv } from './config/env.validation';
+import { ProfileModule } from './profile/profile.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { validateEnv } from './config/env.validation';
     ClientsModule,
     RemindersModule,
     InvoicesModule,
+    ProfileModule,
   ],
   controllers: [AppController],
   providers: [

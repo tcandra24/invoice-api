@@ -116,7 +116,8 @@ export class InvoicesController {
   @Post(':id/remind')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Send a manual reminder to the client\'s email (for SENT, PARTIALLY_PAID, or OVERDUE invoices). There is a minimum interval between sends',
+    summary:
+      "Send a manual reminder to the client's email (for SENT, PARTIALLY_PAID, or OVERDUE invoices). There is a minimum interval between sends",
   })
   @ApiWrappedResponse(ReminderLogResponseDto)
   @ApiErrorResponses(404, 429, 502)
