@@ -27,6 +27,7 @@ enum ReminderStage {
   ON_DUE
   AFTER_3
   AFTER_7
+  MANUAL
 }
 
 enum ReminderChannel {

@@ -1,10 +1,13 @@
 import {
   BadGatewayException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import {
   Prisma,
@@ -14,15 +17,18 @@ import {
 import {
   addDays,
   daysUntil,
+  formatDateTimeId,
   toDateOnly,
   todayInJakarta,
 } from '../common/date.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { OPEN_STATUSES } from '../invoices/invoice-status';
+import { OPEN_STATUSES, PAYABLE_STATUSES } from '../invoices/invoice-status';
 import { buildInvoiceEmail } from './invoice-email';
 
-// selisih hari ke jatuh tempo -> tahap reminder
+const HOUR_MS = 60 * 60 * 1000;
+
+// selisih hari ke jatuh tempo -> tahap reminder otomatis
 const STAGE_BY_OFFSET: Record<number, ReminderStage> = {
   3: 'BEFORE_3',
   0: 'ON_DUE',
@@ -33,11 +39,16 @@ const STAGE_BY_OFFSET: Record<number, ReminderStage> = {
 @Injectable()
 export class RemindersService {
   private readonly logger = new Logger(RemindersService.name);
+  private readonly manualCooldownMs: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.manualCooldownMs =
+      Number(config.get('MANUAL_REMINDER_COOLDOWN_HOURS') ?? 24) * HOUR_MS;
+  }
 
   // ---------- Kirim satu email + catat log ----------
 
@@ -48,6 +59,7 @@ export class RemindersService {
         client: true,
         user: true,
         items: true,
+        // Pembayaran yang dibatalkan tidak ikut dihitung
         payments: { where: { voidedAt: null } },
       },
     });
@@ -100,10 +112,59 @@ export class RemindersService {
       throw new BadGatewayException('Failed to send email to client');
     }
 
-    await this.prisma.reminderLog.create({
+    // Baris log dikembalikan, dipakai sebagai response endpoint manual
+    return this.prisma.reminderLog.create({
       data: { invoiceId, stage, channel, status: 'SENT', recipient },
     });
-    return { channel, recipient };
+  }
+
+  // ---------- Pengingat manual ----------
+
+  /**
+   * Dipicu user lewat endpoint. Aturan:
+   *  - invoice milik user (kalau bukan: 404)
+   *  - status SENT, PARTIALLY_PAID, atau OVERDUE
+   *  - client punya email
+   *  - jeda minimal sejak pengingat manual terakhir yang BERHASIL (kalau belum: 429)
+   * Pengiriman yang gagal tidak menghitung jeda, jadi boleh dicoba lagi.
+   */
+  async sendManual(userId: string, invoiceId: string) {
+    const invoice = await this.prisma.invoice.findFirst({
+      where: { id: invoiceId, userId },
+      select: { id: true, status: true, client: { select: { email: true } } },
+    });
+    if (!invoice) {
+      throw new NotFoundException(`Invoice with id ${invoiceId} not found`);
+    }
+    if (!PAYABLE_STATUSES.includes(invoice.status)) {
+      throw new BadRequestException(
+        `Invoice with status ${invoice.status} does not require a reminder`,
+      );
+    }
+    if (!invoice.client.email) {
+      throw new BadRequestException(
+        'Client have no email, please complete client data first',
+      );
+    }
+
+    const lastManual = await this.prisma.reminderLog.findFirst({
+      where: { invoiceId, stage: 'MANUAL', status: 'SENT' },
+      orderBy: { sentAt: 'desc' },
+      select: { sentAt: true },
+    });
+    if (lastManual) {
+      const nextAllowedAt = new Date(
+        lastManual.sentAt.getTime() + this.manualCooldownMs,
+      );
+      if (nextAllowedAt > new Date()) {
+        throw new HttpException(
+          `Reminder for this invoice has just been sent. Please try again after ${formatDateTimeId(nextAllowedAt)}`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    return this.sendNotice(invoiceId, 'MANUAL');
   }
 
   // ---------- Job harian ----------

@@ -15,6 +15,8 @@ const envSchema = z
     JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
 
+    MANUAL_REMINDER_COOLDOWN_HOURS: z.coerce.number().positive().default(24),
+
     CORS_ORIGINS: z.string().optional(),
     SWAGGER_ENABLED: z.enum(['true', 'false']).optional(),
     THROTTLE_DISABLED: z.enum(['true', 'false']).optional(),

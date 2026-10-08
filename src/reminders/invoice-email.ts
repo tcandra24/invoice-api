@@ -24,12 +24,15 @@ export interface InvoiceEmailData {
 }
 
 export function buildInvoiceEmail(d: InvoiceEmailData) {
+  const due = formatDateId(d.dueDate);
+
   const subjects: Record<ReminderStage, string> = {
     INITIAL: `Invoice ${d.number} dari ${d.businessName}`,
     BEFORE_3: `Reminder: invoice ${d.number} due in 3 days`,
     ON_DUE: `Invoice ${d.number} due today`,
     AFTER_3: `Invoice ${d.number} late 3 days`,
     AFTER_7: `Invoice ${d.number} late 7 days`,
+    MANUAL: `Reminder: invoice ${d.number}`,
   };
 
   const intros: Record<ReminderStage, string> = {
@@ -38,9 +41,9 @@ export function buildInvoiceEmail(d: InvoiceEmailData) {
     ON_DUE: `Invoice ${d.number} is due today.`,
     AFTER_3: `Invoice ${d.number} is late 3 days.`,
     AFTER_7: `Invoice ${d.number} is late 7 days.`,
+    MANUAL: `Here is a reminder regarding the invoice ${d.number} due on ${due}.`,
   };
 
-  const due = formatDateId(d.dueDate);
   const hasDiscount = !d.discount.isZero();
   const hasTax = !d.tax.isZero();
   const hasPaid = !d.paid.isZero();
@@ -111,11 +114,17 @@ export function buildInvoiceEmail(d: InvoiceEmailData) {
         ${summaryRow('Remaining', formatRupiah(d.remaining), true)}
       </tfoot>
     </table>
-    <p><strong>Due:</strong> ${escapeHtml(due)}</p>
+    <p>
+      <strong>Due:</strong> ${escapeHtml(due)}
+    </p>
     ${d.notes ? `<p><strong>Note:</strong> ${escapeHtml(d.notes)}</p>` : ''}
-    <p style="color:#666;font-size:13px">If you have already paid, please disregard this message.
-    Questions? Reply to this email or contact ${escapeHtml(d.ownerEmail)}.</p>
-    <p>Best regards,<br>${escapeHtml(d.businessName)}</p>
+    <p style="color:#666;font-size:13px">
+      If you have already paid, please disregard this message.
+      Questions? Reply to this email or contact ${escapeHtml(d.ownerEmail)}.
+    </p>
+    <p>
+      Best regards,<br>${escapeHtml(d.businessName)}
+    </p>
   </div>`;
 
   return {

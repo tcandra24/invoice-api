@@ -17,6 +17,8 @@ import {
   ApiPaginatedResponse,
   ApiWrappedResponse,
 } from '../common/swagger/api-responses';
+import { ReminderLogResponseDto } from '../reminders/dto/reminder-response.dto';
+import { RemindersService } from '../reminders/reminders.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import {
@@ -40,7 +42,10 @@ import { InvoicesService } from './invoices.service';
 @ApiErrorResponses(400, 401, 429)
 @Controller('invoices')
 export class InvoicesController {
-  constructor(private readonly invoicesService: InvoicesService) {}
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly remindersService: RemindersService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create invoice (initial status DRAFT)' })
@@ -106,6 +111,17 @@ export class InvoicesController {
   @ApiErrorResponses(404, 502)
   send(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.invoicesService.send(userId, id);
+  }
+
+  @Post(':id/remind')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Send a manual reminder to the client\'s email (for SENT, PARTIALLY_PAID, or OVERDUE invoices). There is a minimum interval between sends',
+  })
+  @ApiWrappedResponse(ReminderLogResponseDto)
+  @ApiErrorResponses(404, 429, 502)
+  remind(@CurrentUser('id') userId: string, @Param('id') id: string) {
+    return this.remindersService.sendManual(userId, id);
   }
 
   @Post(':id/void')

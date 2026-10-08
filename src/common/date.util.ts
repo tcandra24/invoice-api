@@ -29,3 +29,13 @@ export function formatDateId(date: Date): string {
     timeZone: 'UTC',
   }).format(toDateOnly(date));
 }
+
+/** Tanggal dan jam dalam WIB, untuk pesan ke user. */
+export function formatDateTimeId(date: Date): string {
+  const text = new Intl.DateTimeFormat('id-ID', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+    timeZone: 'Asia/Jakarta',
+  }).format(date);
+  return `${text} WIB`;
+}
