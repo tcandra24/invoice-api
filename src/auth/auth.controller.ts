@@ -15,14 +15,20 @@ import {
   LogoutAllResponseDto,
   UserPublicResponseDto,
 } from './dto/auth-response.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { PasswordResetService } from './password-reset.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordResetService: PasswordResetService,
+  ) {}
 
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -73,6 +79,34 @@ export class AuthController {
   @ApiErrorResponses(400, 429)
   logout(@Body() dto: RefreshTokenDto) {
     return this.authService.logout(dto.refreshToken);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('forgot-password')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Request a password reset link by email. The response is always the same, whether or not the email is registered',
+  })
+  @ApiWrappedResponse(MessageResponseDto)
+  @ApiErrorResponses(400, 429)
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.passwordResetService.requestReset(dto.email);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Set a new password using the token from the reset email. Revokes all sessions',
+  })
+  @ApiWrappedResponse(MessageResponseDto)
+  @ApiErrorResponses(400, 429)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.passwordResetService.resetPassword(dto.token, dto.newPassword);
   }
 
   @ApiBearerAuth()

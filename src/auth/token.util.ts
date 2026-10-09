@@ -1,5 +1,10 @@
 import { createHash, randomBytes } from 'crypto';
 
+/** Token acak 64 karakter (bukan JWT). Dipakai untuk refresh token dan reset password. */
+export function generateRandomToken(): string {
+  return randomBytes(48).toString('base64url');
+}
+
 /** Refresh token: string acak 64 karakter (bukan JWT). */
 export function generateRefreshToken(): string {
   return randomBytes(48).toString('base64url');

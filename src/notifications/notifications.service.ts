@@ -10,6 +10,8 @@ export interface EmailMessage {
   text: string;
   html: string;
   replyTo?: string;
+  /** Isi berisi rahasia (misalnya token). Tidak dicetak ke log di production. */
+  sensitive?: boolean;
 }
 
 @Injectable()
@@ -17,10 +19,12 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly transporter: Transporter | null;
   private readonly from: string;
+  private readonly isProduction: boolean;
   readonly channel: ReminderChannel;
 
   constructor(config: ConfigService) {
     const host = config.get<string>('SMTP_HOST');
+    this.isProduction = config.get<string>('NODE_ENV') === 'production';
     this.from =
       config.get<string>('MAIL_FROM') ??
       'Invoice App <no-reply@invoice-app.test>';
@@ -47,14 +51,20 @@ export class NotificationsService {
   async sendEmail(
     message: EmailMessage,
   ): Promise<{ channel: ReminderChannel }> {
+    const { sensitive, ...mail } = message;
+
     if (!this.transporter) {
+      const body =
+        sensitive && this.isProduction
+          ? '[content hidden: sensitive]'
+          : mail.text;
       this.logger.log(
-        `[MOCK EMAIL] ke=${message.to} | subjek=${message.subject}\n${message.text}`,
+        `[MOCK EMAIL] ke=${mail.to} | subjek=${mail.subject}\n${body}`,
       );
       return { channel: 'LOG' };
     }
 
-    await this.transporter.sendMail({ from: this.from, ...message });
+    await this.transporter.sendMail({ from: this.from, ...mail });
     return { channel: 'EMAIL' };
   }
 }

@@ -17,6 +17,10 @@ const envSchema = z
 
     MANUAL_REMINDER_COOLDOWN_HOURS: z.coerce.number().positive().default(24),
 
+    PASSWORD_RESET_URL: z.url().default('http://localhost:3001/reset-password'),
+    PASSWORD_RESET_TTL_MINUTES: z.coerce.number().positive().default(30),
+    PASSWORD_RESET_COOLDOWN_MINUTES: z.coerce.number().positive().default(2),
+
     CORS_ORIGINS: z.string().optional(),
     SWAGGER_ENABLED: z.enum(['true', 'false']).optional(),
     THROTTLE_DISABLED: z.enum(['true', 'false']).optional(),
